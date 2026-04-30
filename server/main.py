@@ -1,7 +1,9 @@
 import os
+import secrets
+import time
 import numpy as np
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -12,6 +14,9 @@ from server.mcp_tools import mcp, init_mcp
 
 API_KEY = os.environ.get("API_KEY", "")
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
+
+# OAuth2 temporary auth codes (code -> {redirect_uri, expires})
+_auth_codes: dict[str, dict] = {}
 
 _db: Database | None = None
 
@@ -69,12 +74,63 @@ def create_app(db_path: str = None) -> FastAPI:
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
-        if request.url.path in ("/health", "/docs", "/openapi.json"):
+        # OAuth2 and health endpoints are unauthenticated
+        open_paths = ("/health", "/docs", "/openapi.json", "/authorize", "/token")
+        if request.url.path in open_paths:
             return await call_next(request)
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer ") or auth[7:] != API_KEY:
             return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
         return await call_next(request)
+
+    # --- OAuth2 endpoints for claude.ai custom connector ---
+
+    @app.get("/authorize")
+    async def oauth_authorize(
+        response_type: str = "",
+        client_id: str = "",
+        redirect_uri: str = "",
+        code_challenge: str = "",
+        code_challenge_method: str = "",
+        state: str = "",
+    ):
+        """OAuth2 authorize endpoint. Generates a code and redirects back."""
+        code = secrets.token_urlsafe(32)
+        _auth_codes[code] = {
+            "redirect_uri": redirect_uri,
+            "expires": time.time() + 300,  # 5 min expiry
+        }
+        # Clean expired codes
+        now = time.time()
+        expired = [k for k, v in _auth_codes.items() if v["expires"] < now]
+        for k in expired:
+            del _auth_codes[k]
+
+        return RedirectResponse(
+            url=f"{redirect_uri}?code={code}&state={state}",
+            status_code=302,
+        )
+
+    @app.post("/token")
+    async def oauth_token(
+        grant_type: str = Form(""),
+        code: str = Form(""),
+        redirect_uri: str = Form(""),
+        client_id: str = Form(""),
+        code_verifier: str = Form(""),
+    ):
+        """OAuth2 token exchange. Returns the API key as an access token."""
+        if grant_type == "authorization_code" and code in _auth_codes:
+            entry = _auth_codes.pop(code)
+            if time.time() < entry["expires"]:
+                return {
+                    "access_token": API_KEY,
+                    "token_type": "Bearer",
+                    "expires_in": 86400 * 365,
+                }
+        return JSONResponse(status_code=400, content={"error": "invalid_grant"})
+
+    # --- End OAuth2 ---
 
     @app.get("/health")
     async def health():
