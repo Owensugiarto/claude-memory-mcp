@@ -13,6 +13,7 @@ const PROXY_URL = "/api/mcp";
 const HEALTH_URL = "/api/health";
 
 let mcpSessionId: string | null = null;
+let initialized = false;
 let requestId = 0;
 let initPromise: Promise<void> | null = null;
 
@@ -82,14 +83,20 @@ async function initialize(): Promise<void> {
     throw new Error(`MCP init failed: ${initRes.error.message}`);
   }
 
-  await mcpRaw({
-    jsonrpc: "2.0",
-    method: "notifications/initialized",
-  });
+  // In stateless mode, server doesn't return Mcp-Session.
+  // Send notification only if we got a session (stateful mode).
+  if (mcpSessionId) {
+    await mcpRaw({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+    });
+  }
+
+  initialized = true;
 }
 
 async function ensureInitialized(): Promise<void> {
-  if (mcpSessionId) return;
+  if (initialized) return;
   if (!initPromise) {
     initPromise = initialize().catch((err) => {
       initPromise = null;
@@ -170,6 +177,7 @@ export async function getMemoryStats(): Promise<MemoryStats> {
 
 export function resetSession(): void {
   mcpSessionId = null;
+  initialized = false;
   initPromise = null;
   requestId = 0;
 }
