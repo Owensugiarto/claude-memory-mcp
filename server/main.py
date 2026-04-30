@@ -34,10 +34,10 @@ class IngestMessage(BaseModel):
 class IngestRequest(BaseModel):
     source: str
     session_id: str
-    project: str = None
-    machine_name: str = None
+    project: str | None = None
+    machine_name: str | None = None
     messages: list[IngestMessage] = []
-    metadata: dict = None
+    metadata: dict | None = None
 
 
 async def embed_new_messages(db: Database, session_id: str):
