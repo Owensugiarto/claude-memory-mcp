@@ -82,7 +82,7 @@ def create_app(db_path: str = None) -> FastAPI:
         return {"ok": True, **stats}
 
     @app.post("/ingest")
-    @limiter.limit("30/minute")
+    @limiter.limit("120/minute")
     async def ingest(request: Request, req: IngestRequest):
         metadata = req.metadata or {}
         _db.upsert_session(
