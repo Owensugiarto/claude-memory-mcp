@@ -65,17 +65,18 @@ def parse_conversation(data: dict, filename: str) -> dict | None:
         else:
             continue  # skip system messages etc.
 
-        # Extract text content
+        # Extract text content — try .text first (Anthropic export uses this),
+        # then fall back to .content string or .content list blocks
         content = ""
-        if isinstance(msg.get("content"), str):
+        if isinstance(msg.get("text"), str) and msg["text"].strip():
+            content = msg["text"]
+        elif isinstance(msg.get("content"), str):
             content = msg["content"]
         elif isinstance(msg.get("content"), list):
             content = " ".join(
                 block.get("text", "") for block in msg["content"]
                 if isinstance(block, dict) and block.get("type") == "text"
             )
-        elif isinstance(msg.get("text"), str):
-            content = msg["text"]
 
         if not content.strip():
             continue
@@ -154,7 +155,7 @@ def ingest_zip(zip_path: str, server_url: str, api_key: str):
                         print(f"  {conv_name}: {result.get('messages_inserted', 0)} msgs")
                         ingested += 1
                     else:
-                        print(f"  {name}: FAILED {r.status_code}")
+                        print(f"  {name}: FAILED {r.status_code} {r.text[:200]}")
                 except Exception as e:
                     print(f"  {name}: ERROR {e}")
 
