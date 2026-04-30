@@ -5,7 +5,7 @@ from server.database import Database
 from server.embeddings import batch_embed
 from server.search import cosine_search, rrf_fuse
 
-mcp = FastMCP("claude-memory")
+mcp = FastMCP("claude-memory", streamable_http_path="/")
 
 _db: Database | None = None
 
