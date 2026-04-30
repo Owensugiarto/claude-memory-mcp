@@ -1,11 +1,19 @@
 import json
 import numpy as np
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from server.database import Database
 from server.embeddings import batch_embed
 from server.search import cosine_search, rrf_fuse
 
-mcp = FastMCP("claude-memory", streamable_http_path="/")
+mcp = FastMCP(
+    "claude-memory",
+    streamable_http_path="/",
+    host="0.0.0.0",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
+)
 
 _db: Database | None = None
 
