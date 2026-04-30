@@ -213,12 +213,10 @@ def create_app(db_path: str = None) -> FastAPI:
 
         return {"ok": True, "session_id": req.session_id, "messages_inserted": inserted}
 
-    # Mount MCP at root with path="/" so POST / works for claude.ai
-    # Also mount at /mcp for Claude Code
+    # Mount MCP — the SDK creates routes at /mcp/ internally
+    # Mount at root so /mcp/ is accessible directly
     mcp_app = mcp.streamable_http_app()
-    app.mount("/mcp", mcp_app)
-    mcp_app_root = mcp.streamable_http_app(path="/")
-    app.mount("/", mcp_app_root)
+    app.mount("/", mcp_app)
 
     return app
 
