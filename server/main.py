@@ -2,7 +2,7 @@ import os
 import secrets
 import time
 import numpy as np
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -74,9 +74,10 @@ def create_app(db_path: str = None) -> FastAPI:
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
-        # OAuth2 and health endpoints are unauthenticated
+        # OAuth2, discovery, and health endpoints are unauthenticated
         open_paths = ("/health", "/docs", "/openapi.json", "/authorize", "/token",
-                      "/.well-known/oauth-authorization-server")
+                      "/.well-known/oauth-authorization-server",
+                      "/.well-known/oauth-protected-resource")
         if request.url.path in open_paths:
             return await call_next(request)
         auth = request.headers.get("Authorization", "")
@@ -89,7 +90,7 @@ def create_app(db_path: str = None) -> FastAPI:
     @app.get("/.well-known/oauth-authorization-server")
     async def oauth_metadata(request: Request):
         """RFC 8414 OAuth server metadata for MCP client discovery."""
-        base = str(request.base_url).rstrip("/")
+        base = "https://owen-claude-memory.fly.dev"
         return {
             "issuer": base,
             "authorization_endpoint": f"{base}/authorize",
@@ -97,6 +98,15 @@ def create_app(db_path: str = None) -> FastAPI:
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code"],
             "code_challenge_methods_supported": ["S256"],
+        }
+
+    @app.get("/.well-known/oauth-protected-resource")
+    async def oauth_protected_resource(request: Request):
+        """RFC 9470 protected resource metadata."""
+        base = "https://owen-claude-memory.fly.dev"
+        return {
+            "resource": base,
+            "authorization_servers": [base],
         }
 
     @app.get("/authorize")
@@ -112,7 +122,7 @@ def create_app(db_path: str = None) -> FastAPI:
         code = secrets.token_urlsafe(32)
         _auth_codes[code] = {
             "redirect_uri": redirect_uri,
-            "expires": time.time() + 300,  # 5 min expiry
+            "expires": time.time() + 300,
         }
         # Clean expired codes
         now = time.time()
@@ -126,14 +136,33 @@ def create_app(db_path: str = None) -> FastAPI:
         )
 
     @app.post("/token")
-    async def oauth_token(
+    async def oauth_token_post(
         grant_type: str = Form(""),
         code: str = Form(""),
         redirect_uri: str = Form(""),
         client_id: str = Form(""),
         code_verifier: str = Form(""),
     ):
-        """OAuth2 token exchange. Returns the API key as an access token."""
+        """OAuth2 token exchange via POST (standard)."""
+        if grant_type == "authorization_code" and code in _auth_codes:
+            entry = _auth_codes.pop(code)
+            if time.time() < entry["expires"]:
+                return {
+                    "access_token": API_KEY,
+                    "token_type": "Bearer",
+                    "expires_in": 86400 * 365,
+                }
+        return JSONResponse(status_code=400, content={"error": "invalid_grant"})
+
+    @app.get("/token")
+    async def oauth_token_get(
+        grant_type: str = Query(""),
+        code: str = Query(""),
+        redirect_uri: str = Query(""),
+        client_id: str = Query(""),
+        code_verifier: str = Query(""),
+    ):
+        """OAuth2 token exchange via GET (some clients use this)."""
         if grant_type == "authorization_code" and code in _auth_codes:
             entry = _auth_codes.pop(code)
             if time.time() < entry["expires"]:
@@ -184,9 +213,11 @@ def create_app(db_path: str = None) -> FastAPI:
 
         return {"ok": True, "session_id": req.session_id, "messages_inserted": inserted}
 
-    # Mount MCP at /mcp
+    # Mount MCP at both /mcp and root /
+    # claude.ai posts to root /, Claude Code uses /mcp
     mcp_app = mcp.streamable_http_app()
     app.mount("/mcp", mcp_app)
+    app.mount("/", mcp_app)
 
     return app
 
