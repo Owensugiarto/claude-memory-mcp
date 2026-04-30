@@ -121,26 +121,42 @@ def ingest_zip(zip_path: str, server_url: str, api_key: str):
                 skipped += 1
                 continue
 
-            conversation = parse_conversation(data, name)
-            if not conversation:
+            # Handle both single objects and arrays of conversations
+            items = []
+            if isinstance(data, list):
+                # e.g. conversations.json contains a list of conversation objects
+                items = [d for d in data if isinstance(d, dict) and ("chat_messages" in d or "messages" in d)]
+                if not items:
+                    skipped += 1
+                    continue
+            elif isinstance(data, dict):
+                items = [data]
+            else:
                 skipped += 1
                 continue
 
-            try:
-                r = httpx.post(
-                    f"{server_url}/ingest",
-                    json=conversation,
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=60,
-                )
-                if r.status_code == 200:
-                    result = r.json()
-                    print(f"  {name}: {result.get('messages_inserted', 0)} msgs")
-                    ingested += 1
-                else:
-                    print(f"  {name}: FAILED {r.status_code}")
-            except Exception as e:
-                print(f"  {name}: ERROR {e}")
+            for item in items:
+                conversation = parse_conversation(item, name)
+                if not conversation:
+                    skipped += 1
+                    continue
+
+                try:
+                    r = httpx.post(
+                        f"{server_url}/ingest",
+                        json=conversation,
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=60,
+                    )
+                    if r.status_code == 200:
+                        result = r.json()
+                        conv_name = item.get("name") or item.get("uuid", "?")[:12]
+                        print(f"  {conv_name}: {result.get('messages_inserted', 0)} msgs")
+                        ingested += 1
+                    else:
+                        print(f"  {name}: FAILED {r.status_code}")
+                except Exception as e:
+                    print(f"  {name}: ERROR {e}")
 
         print(f"\nDone. Ingested: {ingested}, Skipped: {skipped}")
 
