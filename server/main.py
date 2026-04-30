@@ -75,7 +75,8 @@ def create_app(db_path: str = None) -> FastAPI:
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
         # OAuth2 and health endpoints are unauthenticated
-        open_paths = ("/health", "/docs", "/openapi.json", "/authorize", "/token")
+        open_paths = ("/health", "/docs", "/openapi.json", "/authorize", "/token",
+                      "/.well-known/oauth-authorization-server")
         if request.url.path in open_paths:
             return await call_next(request)
         auth = request.headers.get("Authorization", "")
@@ -84,6 +85,19 @@ def create_app(db_path: str = None) -> FastAPI:
         return await call_next(request)
 
     # --- OAuth2 endpoints for claude.ai custom connector ---
+
+    @app.get("/.well-known/oauth-authorization-server")
+    async def oauth_metadata(request: Request):
+        """RFC 8414 OAuth server metadata for MCP client discovery."""
+        base = str(request.base_url).rstrip("/")
+        return {
+            "issuer": base,
+            "authorization_endpoint": f"{base}/authorize",
+            "token_endpoint": f"{base}/token",
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code"],
+            "code_challenge_methods_supported": ["S256"],
+        }
 
     @app.get("/authorize")
     async def oauth_authorize(
