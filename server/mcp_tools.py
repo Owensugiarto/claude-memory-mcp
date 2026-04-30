@@ -46,16 +46,18 @@ async def search_memory(query: str, limit: int = 10, source: str = "",
     except Exception:
         keyword_pairs = []
 
-    # Semantic search via embeddings
-    query_emb = await batch_embed([query])
-    ids, embeddings = _db.get_all_embeddings(source=src, project=proj, days=d)
-    if len(ids) > 0:
-        semantic_pairs = cosine_search(
-            np.array(query_emb[0], dtype=np.float32),
-            embeddings, ids, top_k=limit * 2
-        )
-    else:
-        semantic_pairs = []
+    # Semantic search via embeddings (non-fatal if OpenAI is unavailable)
+    semantic_pairs = []
+    try:
+        query_emb = await batch_embed([query])
+        ids, embeddings = _db.get_all_embeddings(source=src, project=proj, days=d)
+        if len(ids) > 0:
+            semantic_pairs = cosine_search(
+                np.array(query_emb[0], dtype=np.float32),
+                embeddings, ids, top_k=limit * 2
+            )
+    except Exception:
+        pass  # Fall back to keyword-only search
 
     # Fuse with RRF
     fused = rrf_fuse(keyword_pairs, semantic_pairs)[:limit]
