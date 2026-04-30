@@ -107,7 +107,10 @@ def create_app(db_path: str = None) -> FastAPI:
         inserted = _db.insert_messages(req.session_id, messages)
 
         if inserted > 0:
-            await embed_new_messages(_db, req.session_id)
+            try:
+                await embed_new_messages(_db, req.session_id)
+            except Exception as e:
+                print(f"Embedding failed (non-fatal): {e}")
 
         return {"ok": True, "session_id": req.session_id, "messages_inserted": inserted}
 
