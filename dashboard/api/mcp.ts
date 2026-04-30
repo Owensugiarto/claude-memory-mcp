@@ -32,8 +32,11 @@ export default async function handler(req: Request): Promise<Response> {
   const responseHeaders = new Headers();
   const ct = upstream.headers.get("content-type");
   if (ct) responseHeaders.set("Content-Type", ct);
-  const session = upstream.headers.get("Mcp-Session");
-  if (session) responseHeaders.set("Mcp-Session", session);
+  const session = upstream.headers.get("mcp-session");
+  if (session) {
+    responseHeaders.set("Mcp-Session", session);
+    responseHeaders.set("Access-Control-Expose-Headers", "Mcp-Session");
+  }
 
   return new Response(upstream.body, {
     status: upstream.status,
