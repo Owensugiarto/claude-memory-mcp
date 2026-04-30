@@ -1,0 +1,176 @@
+{
+  "agent": "researcher",
+  "task": "mem0dash1",
+  "timestamp": "2026-04-30",
+  "recommended_stack": {
+    "verdict": "Vite + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui",
+    "rationale": "This is the dominant 2025 stack for personal dashboards with a Python/FastAPI backend. Zero framework overhead vs Next.js, proper component routing for session detail views, and shadcn/ui gives a Linear/Vercel-tier aesthetic out of the box. TanStack Query handles all async data fetching with caching. Zustand for lightweight local UI state (selected session, search query, open panels).",
+    "core_libraries": {
+      "bundler": "Vite 6",
+      "ui_framework": "React 19",
+      "language": "TypeScript",
+      "styling": "Tailwind CSS v4",
+      "component_library": "shadcn/ui (Radix primitives)",
+      "routing": "TanStack Router v1 (file-based, typed routes) — or React Router v7 if simpler",
+      "data_fetching": "TanStack Query v5 (caching, background refetch, loading states)",
+      "local_state": "Zustand v5 (auth token store, UI state)",
+      "animations": "GSAP 3 for page transitions + Framer Motion for micro-animations on cards/results",
+      "markdown_rendering": "react-markdown + remark-gfm (for assistant message content)",
+      "syntax_highlighting": "shiki or rehype-highlight (for code blocks in conversations)",
+      "command_palette": "cmdk (shadcn/ui wraps this for the Cmd+K pattern)",
+      "icons": "Lucide React",
+      "date_formatting": "date-fns"
+    },
+    "api_layer": {
+      "pattern": "Thin typed fetch wrapper — no axios needed for this scope",
+      "auth": "Bearer token stored in Zustand, injected as Authorization header in all fetch calls. Token sourced from .env (VITE_API_TOKEN) for local dev; for Vercel deployment, proxy through a Vercel serverless function (/api/mcp-proxy) that injects the token server-side from an env var not prefixed with VITE_.",
+      "mcp_calls": "POST / with JSON body {method: 'tools/call', params: {name: '<tool>', arguments: {...}}} — wrap in a typed callTool(name, args) helper",
+      "endpoints": {
+        "health": "GET /health — stats, called once on mount, refetched every 60s",
+        "ingest": "POST /ingest — likely out of scope for v1 dashboard",
+        "mcp_tools": "POST / — search_memory, get_session, list_recent_sessions, memory_stats"
+      }
+    },
+    "deployment": {
+      "recommended": "Vercel SPA deployment with /api/proxy edge function to hide Bearer token",
+      "alternative": "Local-only: Vite dev server, token in .env, no proxy needed",
+      "cors_note": "Fly.dev FastAPI backend must have CORS enabled for the Vercel frontend origin. Add allowed_origins in FastAPI middleware."
+    },
+    "reference_template": "satnaing/shadcn-admin — open source, Vite + React + TypeScript + shadcn/ui, MIT license, collapsible sidebar, dark mode, mobile sheet navigation. https://github.com/satnaing/shadcn-admin"
+  },
+  "ui_patterns": {
+    "layout": {
+      "structure": "3-panel layout: fixed left sidebar (session list) + main content area (session detail or search results) + optional right panel (stats/metadata)",
+      "mobile": "Sidebar collapses to sheet drawer (shadcn Sheet component). Bottom tab bar optional for: Sessions / Search / Stats",
+      "sidebar_width": "260-280px on desktop, full-width sheet on mobile",
+      "dark_mode": "Dark by default — near-black (#0a0a0b or similar) bg, this is a developer ops tool not a marketing page",
+      "aesthetic": "Linear / Vercel dashboard register: monospace metadata, subtle borders, muted grays, single accent color (blue or violet)"
+    },
+    "session_list": {
+      "card_pattern": "Compact list rows (not large cards) — each row shows: project/source tag, session date/time, first human message as preview (truncated to ~80 chars), message count badge",
+      "grouping": "Group by date: Today, Yesterday, This Week, Earlier — collapsible date headers",
+      "pagination": "Infinite scroll via TanStack Query's useInfiniteQuery — load 20 sessions per page, fetch next on scroll near bottom",
+      "active_state": "Selected session row gets left accent border + slightly lighter bg"
+    },
+    "conversation_viewer": {
+      "render_style": "Document/transcript view — NOT chat bubbles. Full-width, readable like a screenplay.",
+      "human_turns": "Left-aligned label 'You' in muted color + content in standard body text",
+      "assistant_turns": "Left-aligned label 'Claude' in accent color + content in standard body text, markdown rendered",
+      "tool_calls": "Collapsed by default into a single-line summary: '[bash] ls /dev' with expand chevron. Expanded state shows full monospace block with syntax highlight. Tool results similarly collapsed.",
+      "timestamps": "Small, muted timestamp on each message turn — relative (2 min ago) on hover shows absolute ISO",
+      "scroll": "Virtual scroll (TanStack Virtual) if sessions are very long (500+ messages) — prevents DOM explosion",
+      "copy_button": "Copy icon on each message block on hover",
+      "key_reference": "varunr89/claude-transcript-viewer — React viewer specifically for Claude Code JSONL transcripts with collapsible tool calls. https://github.com/varunr89/claude-transcript-viewer"
+    },
+    "search": {
+      "entry_point": "Cmd+K command palette (cmdk library, wrapped by shadcn Command component) — opens a modal with search input",
+      "behavior": "Debounced 300ms keystroke triggers search_memory MCP call. Show loading spinner inline.",
+      "result_item": "Each result shows: role badge (user/assistant), project tag, session date, snippet with matching terms bolded/highlighted, relevance score as a subtle progress bar or numeric badge",
+      "highlighting": "Bold the matched terms in the snippet — parse the content field and wrap matches in <mark> or <strong>",
+      "score_display": "Show as a small badge: '0.87' in a muted pill — users understand higher = more relevant",
+      "click_action": "Clicking a result navigates to the session detail view, auto-scrolling to the matched message",
+      "empty_state": "Friendly empty state: 'No memories matched. Try broader terms.' with a reset button",
+      "filters": "v1: no filters. v2 consideration: filter by project, date range, role"
+    },
+    "stats_display": {
+      "placement": "Right sidebar panel on desktop, collapsible section at bottom of mobile layout, or a /stats route",
+      "metrics_to_show": [
+        "Total messages indexed",
+        "Total sessions",
+        "Unique projects",
+        "Date range (oldest to newest session)",
+        "Storage size estimate"
+      ],
+      "visualization": "Simple stat cards with large number + label. No complex charts for v1.",
+      "data_source": "GET /health endpoint — poll every 60 seconds"
+    }
+  },
+  "reference_implementations": [
+    {
+      "name": "varunr89/claude-transcript-viewer",
+      "url": "https://github.com/varunr89/claude-transcript-viewer",
+      "relevance": "Direct match — a React viewer built specifically for Claude Code conversation transcripts with collapsible tool call panels. Study the message rendering and collapse logic.",
+      "use_for": "Conversation viewer component design"
+    },
+    {
+      "name": "satnaing/shadcn-admin",
+      "url": "https://github.com/satnaing/shadcn-admin",
+      "relevance": "Open-source Vite + React + shadcn/ui admin dashboard template. Responsive sidebar, dark mode, TypeScript. Closest aesthetic reference to target.",
+      "use_for": "Overall layout, sidebar, routing structure"
+    },
+    {
+      "name": "raine/claude-history",
+      "url": "https://github.com/raine/claude-history",
+      "relevance": "Fuzzy-search over Claude Code conversation history — similar problem domain, different implementation. Check the data model and search UX.",
+      "use_for": "Search UX patterns, data model reference"
+    },
+    {
+      "name": "PCIRCLE-AI/memesh-llm-memory",
+      "url": "https://github.com/PCIRCLE-AI/memesh-llm-memory",
+      "relevance": "LLM memory layer with SQLite/FTS5 backend (same tech) and a built-in dashboard at localhost:3737. Study the 7-tab layout and memory display patterns.",
+      "use_for": "Memory/session dashboard layout patterns"
+    },
+    {
+      "name": "chatscope/chat-ui-kit-react",
+      "url": "https://github.com/chatscope/chat-ui-kit-react",
+      "relevance": "Mature React chat UI component library. Useful for understanding message layout conventions — though for this dashboard a custom transcript view is better than off-the-shelf chat bubbles.",
+      "use_for": "Fallback component reference for message rendering"
+    },
+    {
+      "name": "Algolia Highlighting Guide",
+      "url": "https://www.algolia.com/doc/guides/building-search-ui/ui-and-ux-patterns/highlighting-snippeting/js",
+      "relevance": "Canonical reference for search result highlighting patterns. The bold-matching-terms approach is exactly what's needed for the search result snippets.",
+      "use_for": "Search result snippet highlighting implementation"
+    }
+  ],
+  "best_practices": {
+    "api_calls": [
+      "Wrap all MCP tool calls in a single typed helper: callTool(name, args) that handles auth header injection, error parsing, and retry on 401",
+      "Use TanStack Query keys like ['sessions', page] and ['session', id] and ['search', query] for automatic deduplication and cache management",
+      "Prefetch the next page of sessions when user is 80% scrolled through current page",
+      "Show stale data while refetching (TanStack Query staleTime: 30000) — memory data doesn't change in real time"
+    ],
+    "auth": [
+      "For local dev: store Bearer token in .env as VITE_API_TOKEN, inject in fetch wrapper",
+      "For Vercel deployment: create /api/proxy.ts Vercel serverless function that reads process.env.API_TOKEN (server-side only, no VITE_ prefix) and forwards requests to the Fly.dev backend",
+      "Never log the token — mask it in any debug output",
+      "On 401 response: show an 'Invalid token' banner, don't silently fail"
+    ],
+    "conversation_rendering": [
+      "Parse message content with react-markdown for assistant turns — Claude responses are almost always markdown",
+      "Detect code blocks in content and use shiki for syntax highlighting with the same dark theme as the dashboard",
+      "Tool call blocks should show: tool name as header, parameters as collapsible JSON, result as collapsible monospace block",
+      "Add a 'Copy message' button that appears on hover — power users will want to copy snippets",
+      "For very long tool outputs (bash results, file reads), truncate at 50 lines with 'Show more' — prevents layout explosion",
+      "Consider virtualizing the message list if sessions exceed ~200 messages — TanStack Virtual handles this"
+    ],
+    "search_ux": [
+      "Debounce search input at 300ms — avoid hammering the API on every keystroke",
+      "Show the score field from search results as a relevance indicator — users find it useful for calibrating queries",
+      "Highlight matched terms in result snippets by bolding them — this is the primary UX signal for why a result appeared",
+      "Group results by session_id when multiple results come from the same conversation",
+      "Keyboard-navigate search results (arrow keys, Enter to open) — this is a power-user tool"
+    ],
+    "mobile": [
+      "Use shadcn Sheet for the sidebar drawer on mobile — renders as bottom-up or left-edge drawer",
+      "Touch-friendly tap targets: minimum 44px height on all interactive elements",
+      "Conversation viewer renders well on mobile in single-column transcript style — chat bubbles would overflow",
+      "Search results stack vertically with larger tap areas on mobile",
+      "Consider a sticky bottom bar on mobile: Sessions | Search | Stats — 3 tabs max"
+    ],
+    "performance": [
+      "TanStack Query caches session list and individual sessions — navigating back to a session should be instant",
+      "Use React.memo on session list items — the list re-renders on search input changes otherwise",
+      "Lazy-load the conversation viewer route — it imports markdown + syntax highlighting which are heavy",
+      "Use Vite code splitting: the command palette (cmdk) and conversation viewer should be separate chunks"
+    ],
+    "design_system": [
+      "Use shadcn/ui components as the base — they are Radix-primitives wrapped in Tailwind, fully accessible and dark-mode ready",
+      "Set a single accent color (recommend: violet or blue) — use it for Claude turn labels, active states, and focus rings",
+      "Monospace font for all metadata: timestamps, session IDs, scores, project tags — Geist Mono or JetBrains Mono",
+      "Sans-serif for body content: Geist or Inter",
+      "Keep the conversation content area max-width ~720px centered — same as a readable document column",
+      "Subtle animations: GSAP for page transitions (fade + slight upward translate), Framer Motion for search result entrance (stagger)"
+    ]
+  }
+}

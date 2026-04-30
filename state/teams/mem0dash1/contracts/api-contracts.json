@@ -1,0 +1,173 @@
+{
+  "baseUrl": "https://owen-claude-memory.fly.dev",
+  "protocol": "MCP (JSON-RPC 2.0 over HTTP)",
+  "auth": {
+    "type": "Bearer",
+    "header": "Authorization",
+    "format": "Bearer <token>",
+    "note": "Token is injected server-side via Vercel proxy. Frontend never sees it."
+  },
+  "endpoints": {
+    "health": {
+      "method": "GET",
+      "path": "/health",
+      "auth": false,
+      "description": "Health check + basic stats",
+      "response": {
+        "ok": "boolean",
+        "total_sessions": "number",
+        "total_messages": "number",
+        "by_source": "Record<string, number>",
+        "by_project": "Record<string, number>"
+      }
+    },
+    "mcp": {
+      "method": "POST",
+      "path": "/",
+      "auth": true,
+      "contentType": "application/json",
+      "protocol": "JSON-RPC 2.0",
+      "description": "MCP Streamable HTTP endpoint. Requires initialize handshake first.",
+      "headers": {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+      },
+      "initialization": {
+        "request": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "initialize",
+          "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": { "name": "mem0-dashboard", "version": "1.0.0" }
+          }
+        },
+        "followUp": {
+          "jsonrpc": "2.0",
+          "method": "notifications/initialized"
+        },
+        "note": "Send initialize, get response with session ID in Mcp-Session header. Then send notifications/initialized. Use Mcp-Session header on all subsequent requests."
+      },
+      "tools": {
+        "search_memory": {
+          "description": "Search across all conversations by keyword + semantic meaning",
+          "arguments": {
+            "query": { "type": "string", "required": true },
+            "limit": { "type": "number", "default": 10 },
+            "source": { "type": "string", "enum": ["claude_code", "claude_ai", ""], "default": "" },
+            "project": { "type": "string", "default": "" },
+            "days": { "type": "number", "default": 0, "note": "0 = all time" }
+          },
+          "response": {
+            "results": [
+              {
+                "content": "string (max 2000 chars)",
+                "role": "string",
+                "session_id": "string (UUID)",
+                "project": "string | null",
+                "source": "string",
+                "timestamp": "string (ISO 8601)",
+                "score": "number"
+              }
+            ],
+            "total": "number"
+          }
+        },
+        "get_session": {
+          "description": "Retrieve a full conversation by session ID",
+          "arguments": {
+            "session_id": { "type": "string", "required": true }
+          },
+          "response": {
+            "session": {
+              "session_id": "string",
+              "source": "string",
+              "project": "string | null",
+              "machine_name": "string | null",
+              "session_slug": "string | null",
+              "created_at": "string (ISO 8601)",
+              "updated_at": "string (ISO 8601)"
+            },
+            "messages": [
+              {
+                "role": "string",
+                "content": "string (max 5000 chars)",
+                "timestamp": "string (ISO 8601)"
+              }
+            ]
+          },
+          "errorResponse": {
+            "error": "string"
+          }
+        },
+        "list_recent_sessions": {
+          "description": "List recent sessions with summaries",
+          "arguments": {
+            "limit": { "type": "number", "default": 20 },
+            "source": { "type": "string", "enum": ["claude_code", "claude_ai", ""], "default": "" },
+            "project": { "type": "string", "default": "" },
+            "days": { "type": "number", "default": 0 }
+          },
+          "response": {
+            "sessions": [
+              {
+                "session_id": "string",
+                "source": "string",
+                "project": "string | null",
+                "machine_name": "string | null",
+                "session_slug": "string | null",
+                "created_at": "string (ISO 8601)",
+                "updated_at": "string (ISO 8601)",
+                "message_count": "number",
+                "first_message": "string (ISO 8601) | null",
+                "last_message": "string (ISO 8601) | null"
+              }
+            ],
+            "total": "number"
+          }
+        },
+        "memory_stats": {
+          "description": "Get counts of indexed sessions and messages, grouped by source and project",
+          "arguments": {},
+          "response": {
+            "total_sessions": "number",
+            "total_messages": "number",
+            "by_source": "Record<string, number>",
+            "by_project": "Record<string, number>"
+          }
+        }
+      },
+      "toolCallFormat": {
+        "request": {
+          "jsonrpc": "2.0",
+          "id": "<incrementing number>",
+          "method": "tools/call",
+          "params": {
+            "name": "<tool_name>",
+            "arguments": {}
+          }
+        },
+        "response": {
+          "jsonrpc": "2.0",
+          "id": "<matching id>",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "<JSON string — parse this to get the actual data>"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "proxyDesign": {
+    "vercelRoute": "/api/mcp",
+    "behavior": "Forwards POST body to baseUrl + '/', injects Bearer token, returns response",
+    "envVar": "MCP_API_KEY",
+    "healthRoute": "/api/health",
+    "healthBehavior": "Proxies GET to baseUrl + '/health' (no auth needed but proxied for CORS)"
+  }
+}

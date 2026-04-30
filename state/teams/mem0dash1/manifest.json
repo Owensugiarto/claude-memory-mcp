@@ -1,0 +1,31 @@
+{
+  "id": "mem0dash1",
+  "type": "build",
+  "task": "Build a frontend dashboard for the Claude Memory MCP server. Browse sessions, search memory, view conversations, see stats.",
+  "status": "building",
+  "created": "2026-04-30T21:10:00Z",
+  "updated": "2026-04-30T21:45:00Z",
+  "phase": 1,
+  "teamName": "build-mem0dash1",
+  "projectDir": "C:\\dev\\claude-memory-mcp",
+  "answers": {
+    "design": "Dark dev-tool — Linear/Vercel/Raycast aesthetic, dark bg, sharp typography, subtle borders, command palette",
+    "deploy": "Vercel — free tier, auto-deploy, serverless proxy hides API key",
+    "stack": "Vite + React 19 + shadcn/ui (Nova preset) + TypeScript 6 + Tailwind CSS 4",
+    "chatView": "Document/transcript — role labels, timestamps, markdown rendered, tool calls collapsed",
+    "auth": "Bearer token, proxied through Vercel serverless function (never exposed to browser)",
+    "scope": "Frontend only — backend already exists at https://owen-claude-memory.fly.dev",
+    "apiKey": "XytIKR_iFdmt0O-MFiYBuouq-YRwSAc64h4vTSn50CM",
+    "features": "Session list (grouped by date), full-text search (Cmd+K), conversation viewer, stats dashboard",
+    "mobileSupport": "Responsive — sidebar becomes drawer on mobile"
+  },
+  "teammates": {
+    "architect": { "status": "done", "lastCheckpoint": "scaffold-complete" },
+    "designer": { "status": "not_spawned", "lastCheckpoint": null },
+    "frontend": { "status": "not_spawned", "lastCheckpoint": null },
+    "backend": { "status": "not_spawned", "lastCheckpoint": null },
+    "qa": { "status": "not_spawned", "lastCheckpoint": null }
+  },
+  "completedPhases": ["scaffold"],
+  "errors": []
+}

@@ -1,0 +1,52 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "What are the 3 most important things this dashboard must do well? Rank: (a) browse/scroll sessions chronologically, (b) full-text search across all memory, (c) read a full conversation transcript, (d) see stats at a glance. Which 1-2 are non-negotiable for v1?",
+      "why": "Without a ranked priority list, the build risks spending equal time on everything and shipping nothing great. The MCP server has 4 tools — knowing which 1-2 are load-bearing for daily use shapes layout, routing, and feature scope.",
+      "defaultAnswer": "Primary: browse sessions + read full conversation. Secondary: search. Stats are a nice sidebar widget, not a primary view."
+    },
+    {
+      "id": 2,
+      "question": "What does a 'session' look like in practice — is it a Claude Code conversation (with alternating human/assistant turns), a raw JSON blob, or something else? What fields does list_recent_sessions return, and what does get_session return for a single session?",
+      "why": "The entire data model for the UI — conversation renderer, search results, session cards — depends on the exact shape of session data. If transcripts are markdown strings vs structured message arrays, the rendering approach is completely different.",
+      "defaultAnswer": "Assume sessions have: id, timestamp, title/summary, message array with role+content. Will confirm by calling the API directly before building."
+    },
+    {
+      "id": 3,
+      "question": "Tech stack preference: (a) plain HTML/CSS/JS like your other personal tools (Elara, FOREXManual), (b) React/Vite SPA, (c) Next.js. Given this is a personal read-heavy tool with no auth complexity, is there a strong reason to add a framework, or should this stay lightweight?",
+      "why": "Owen's recent personal tools lean plain HTML or minimal stacks. A dashboard with mostly GET-style reads and a search input doesn't need React. But if Owen wants component reuse, routing between sessions, or future extensibility, a lightweight Vite+React setup pays off.",
+      "defaultAnswer": "Vite + React — lightweight but gives proper routing (session detail page) and component structure without Next.js overhead."
+    },
+    {
+      "id": 4,
+      "question": "Design direction: this is a personal ops tool for reading your own memory — should it feel like (a) a dark developer tool (Vercel/Linear aesthetic: dark bg, monospace accents, precision UI), (b) editorial/premium like your other brand work (Playfair, warm tones), or (c) something else entirely? What's the closest reference you'd point to?",
+      "why": "Owen's design bar is Webflow-tier and he rejects AI-looking output. But the right aesthetic for a memory browser differs from a landing page. A 'personal OS' dark tool aesthetic (Linear, Raycast, Vercel dashboard) is likely the right register — but this needs confirmation before any CSS is written.",
+      "defaultAnswer": "Dark developer tool: near-black bg, clean monospace for metadata, subtle syntax-highlight for conversation turns, GSAP micro-animations on load/transition. Reference: Linear or Vercel dashboard."
+    },
+    {
+      "id": 5,
+      "question": "Search UX: should search feel like (a) a live search-as-you-type input that queries the API on each keystroke (debounced), (b) a command palette (Cmd+K style modal), or (c) a dedicated search page/route? And should search results show snippets with the matching text highlighted, or just session titles?",
+      "why": "This is the most interaction-heavy feature. A Cmd+K command palette would feel premium and developer-tool appropriate. But if the search_memory MCP tool has latency, live-as-you-type could feel sluggish. The answer shapes both the component design and the API call strategy.",
+      "defaultAnswer": "Cmd+K command palette with debounced search, result snippets with match highlight. Falls back to dedicated search route if palette feels cramped."
+    },
+    {
+      "id": 6,
+      "question": "Deployment: where should this live? Options: (a) local dev server only (localhost:3000, run on demand), (b) deployed to Vercel/Fly alongside the backend, (c) added as a static route to the existing fly.dev backend. Is there a preferred URL, and does the API key need to be hidden server-side or is it acceptable in a .env for a local-only tool?",
+      "why": "If this is local-only, the API key can live in a .env and there's no CORS issue. If deployed publicly, the key must go through a proxy/server route or be treated as a secret. Deployment target also determines whether to use Vite build output vs a Node server.",
+      "defaultAnswer": "Deploy to Vercel as a static SPA. Proxy API calls through a lightweight Vercel edge function to keep the Bearer token server-side."
+    },
+    {
+      "id": 7,
+      "question": "Conversation view: when reading a full session, should the transcript render as (a) a clean chat UI (like Claude.ai — alternating bubbles), (b) a document/transcript view (like a screenplay — flat, full-width), or (c) a code-editor style with collapsible tool calls? Should tool use blocks (bash commands, file reads) be collapsed by default or expanded?",
+      "why": "Claude Code sessions contain not just text messages but tool calls, results, and system turns. A naive chat bubble renderer will look broken with 500-line bash outputs. This is a design decision with significant implementation implications.",
+      "defaultAnswer": "Document/transcript view. Tool calls collapsed by default with a toggle. Human turns in one color, assistant in another, tool results in a subtle monospace block."
+    },
+    {
+      "id": 8,
+      "question": "Scope boundary for v1: what is explicitly out of scope? Candidates to exclude: editing/deleting sessions, creating new memory entries, user auth (beyond the hardcoded API key), mobile responsiveness, export to PDF/markdown. Confirming the out-of-scope list prevents scope creep mid-build.",
+      "why": "Owen's feedback pattern shows preference for tight focused builds over feature-complete but buggy ones. Explicitly agreeing on what v1 does NOT include prevents late-stage additions that break the timeline.",
+      "defaultAnswer": "Out of scope for v1: edit/delete, new entry creation, auth UI, mobile layout, export. In scope: session list, session detail, search, stats widget."
+    }
+  ]
+}
