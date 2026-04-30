@@ -2,6 +2,7 @@ import os
 import secrets
 import time
 import numpy as np
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
@@ -65,7 +66,18 @@ def create_app(db_path: str = None) -> FastAPI:
     _db = Database(db_path)
     init_mcp(_db)
 
-    app = FastAPI(title="Claude Memory MCP")
+    # Build MCP starlette app — this initializes session_manager
+    mcp_starlette = mcp.streamable_http_app()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        # MCP session manager needs run() for its task group.
+        # Mounted sub-apps don't get their lifespan called reliably,
+        # so we manage it here in FastAPI's lifespan.
+        async with mcp.session_manager.run():
+            yield
+
+    app = FastAPI(title="Claude Memory MCP", lifespan=lifespan)
     app.state.limiter = limiter
 
     @app.exception_handler(RateLimitExceeded)
@@ -74,7 +86,6 @@ def create_app(db_path: str = None) -> FastAPI:
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
-        # OAuth2, discovery, and health endpoints are unauthenticated
         open_paths = ("/health", "/docs", "/openapi.json", "/authorize", "/token",
                       "/.well-known/oauth-authorization-server",
                       "/.well-known/oauth-protected-resource")
@@ -85,11 +96,10 @@ def create_app(db_path: str = None) -> FastAPI:
             return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
         return await call_next(request)
 
-    # --- OAuth2 endpoints for claude.ai custom connector ---
+    # --- OAuth2 endpoints ---
 
     @app.get("/.well-known/oauth-authorization-server")
     async def oauth_metadata(request: Request):
-        """RFC 8414 OAuth server metadata for MCP client discovery."""
         base = "https://owen-claude-memory.fly.dev"
         return {
             "issuer": base,
@@ -102,7 +112,6 @@ def create_app(db_path: str = None) -> FastAPI:
 
     @app.get("/.well-known/oauth-protected-resource")
     async def oauth_protected_resource(request: Request):
-        """RFC 9470 protected resource metadata."""
         base = "https://owen-claude-memory.fly.dev"
         return {
             "resource": base,
@@ -117,19 +126,17 @@ def create_app(db_path: str = None) -> FastAPI:
         code_challenge: str = "",
         code_challenge_method: str = "",
         state: str = "",
+        resource: str = "",
     ):
-        """OAuth2 authorize endpoint. Generates a code and redirects back."""
         code = secrets.token_urlsafe(32)
         _auth_codes[code] = {
             "redirect_uri": redirect_uri,
             "expires": time.time() + 300,
         }
-        # Clean expired codes
         now = time.time()
         expired = [k for k, v in _auth_codes.items() if v["expires"] < now]
         for k in expired:
             del _auth_codes[k]
-
         return RedirectResponse(
             url=f"{redirect_uri}?code={code}&state={state}",
             status_code=302,
@@ -143,7 +150,6 @@ def create_app(db_path: str = None) -> FastAPI:
         client_id: str = Form(""),
         code_verifier: str = Form(""),
     ):
-        """OAuth2 token exchange via POST (standard)."""
         if grant_type == "authorization_code" and code in _auth_codes:
             entry = _auth_codes.pop(code)
             if time.time() < entry["expires"]:
@@ -162,7 +168,6 @@ def create_app(db_path: str = None) -> FastAPI:
         client_id: str = Query(""),
         code_verifier: str = Query(""),
     ):
-        """OAuth2 token exchange via GET (some clients use this)."""
         if grant_type == "authorization_code" and code in _auth_codes:
             entry = _auth_codes.pop(code)
             if time.time() < entry["expires"]:
@@ -173,7 +178,7 @@ def create_app(db_path: str = None) -> FastAPI:
                 }
         return JSONResponse(status_code=400, content={"error": "invalid_grant"})
 
-    # --- End OAuth2 ---
+    # --- App endpoints ---
 
     @app.get("/health")
     async def health():
@@ -213,10 +218,12 @@ def create_app(db_path: str = None) -> FastAPI:
 
         return {"ok": True, "session_id": req.session_id, "messages_inserted": inserted}
 
-    # Mount MCP — the SDK creates routes at /mcp/ internally
-    # Mount at root so /mcp/ is accessible directly
-    mcp_app = mcp.streamable_http_app()
-    app.mount("/", mcp_app)
+    # --- MCP mount ---
+    # Add MCP routes directly to FastAPI's router (not as a mounted sub-app).
+    # This ensures the session_manager lifecycle is managed by FastAPI's lifespan
+    # instead of the sub-app's lifespan which doesn't fire when mounted.
+    for route in mcp_starlette.routes:
+        app.routes.append(route)
 
     return app
 
