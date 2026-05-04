@@ -1,183 +1,50 @@
 import type {
-  HealthResponse,
-  MemoryStats,
+  DashboardResponse,
+  ServersResponse,
+  ServerDetailResponse,
+  TracesResponse,
+  TraceDetailResponse,
+  TraceParams,
+  SkillsResponse,
+  SkillDetailResponse,
+  MemoryFilesResponse,
+  MemoryFileDetailResponse,
+  UsageResponse,
+  SessionsResponse,
+  SessionDetailResponse,
+  SessionParams,
   SearchResponse,
-  SessionListResponse,
-  SessionResponse,
-  McpRequest,
-  McpResponse,
-  SearchFilters,
-} from "./types";
+} from './types';
 
-const PROXY_URL = "/api/mcp";
-const HEALTH_URL = "/api/health";
+const BASE = '/api/proxy';
 
-let mcpSessionId: string | null = null;
-let initialized = false;
-let requestId = 0;
-let initPromise: Promise<void> | null = null;
-
-function nextId(): number {
-  return ++requestId;
-}
-
-async function mcpRaw(body: McpRequest): Promise<McpResponse> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream",
-  };
-  if (mcpSessionId) {
-    headers["Mcp-Session"] = mcpSessionId;
-  }
-
-  const res = await fetch(PROXY_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
-
-  if (!res.ok) {
-    throw new Error(`MCP request failed: ${res.status} ${res.statusText}`);
-  }
-
-  const sessionHeader = res.headers.get("Mcp-Session");
-  if (sessionHeader) {
-    mcpSessionId = sessionHeader;
-  }
-
-  const contentType = res.headers.get("content-type") || "";
-
-  if (contentType.includes("text/event-stream")) {
-    const text = await res.text();
-    const lines = text.split("\n");
-    let lastData: McpResponse | null = null;
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          lastData = JSON.parse(line.slice(6));
-        } catch {
-          // skip malformed lines
-        }
-      }
-    }
-    if (!lastData) throw new Error("No data in SSE response");
-    return lastData;
-  }
-
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-async function initialize(): Promise<void> {
-  const initRes = await mcpRaw({
-    jsonrpc: "2.0",
-    id: nextId(),
-    method: "initialize",
-    params: {
-      protocolVersion: "2025-03-26",
-      capabilities: {},
-      clientInfo: { name: "mem0-dashboard", version: "1.0.0" },
-    },
-  });
-
-  if (initRes.error) {
-    throw new Error(`MCP init failed: ${initRes.error.message}`);
-  }
-
-  // In stateless mode, server doesn't return Mcp-Session.
-  // Send notification only if we got a session (stateful mode).
-  if (mcpSessionId) {
-    await mcpRaw({
-      jsonrpc: "2.0",
-      method: "notifications/initialized",
-    });
-  }
-
-  initialized = true;
-}
-
-async function ensureInitialized(): Promise<void> {
-  if (initialized) return;
-  if (!initPromise) {
-    initPromise = initialize().catch((err) => {
-      initPromise = null;
-      throw err;
-    });
-  }
-  await initPromise;
-}
-
-async function callTool<T>(name: string, args: Record<string, unknown> = {}, retried = false): Promise<T> {
-  await ensureInitialized();
-
-  try {
-    const res = await mcpRaw({
-      jsonrpc: "2.0",
-      id: nextId(),
-      method: "tools/call",
-      params: { name, arguments: args },
-    });
-
-    if (res.error) {
-      throw new Error(`Tool ${name} failed: ${res.error.message}`);
-    }
-
-    const textContent = res.result?.content?.find((c) => c.type === "text");
-    if (!textContent) {
-      throw new Error(`Tool ${name} returned no text content`);
-    }
-
-    return JSON.parse(textContent.text) as T;
-  } catch (err) {
-    // Session expired or server error — reset and retry once
-    if (!retried) {
-      resetSession();
-      return callTool<T>(name, args, true);
-    }
-    throw err;
-  }
-}
-
-// === Public API ===
-
-export async function getHealth(): Promise<HealthResponse> {
-  const res = await fetch(HEALTH_URL);
-  if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
-  return res.json();
-}
-
-export async function searchMemory(filters: SearchFilters): Promise<SearchResponse> {
-  const args: Record<string, unknown> = { query: filters.query };
-  if (filters.source) args.source = filters.source;
-  if (filters.project) args.project = filters.project;
-  if (filters.days) args.days = filters.days;
-  if (filters.limit) args.limit = filters.limit;
-  return callTool<SearchResponse>("search_memory", args);
-}
-
-export async function getSession(sessionId: string): Promise<SessionResponse> {
-  return callTool<SessionResponse>("get_session", { session_id: sessionId });
-}
-
-export async function listRecentSessions(
-  limit = 20,
-  source?: string,
-  project?: string,
-  days?: number
-): Promise<SessionListResponse> {
-  const args: Record<string, unknown> = { limit };
-  if (source) args.source = source;
-  if (project) args.project = project;
-  if (days) args.days = days;
-  return callTool<SessionListResponse>("list_recent_sessions", args);
-}
-
-export async function getMemoryStats(): Promise<MemoryStats> {
-  return callTool<MemoryStats>("memory_stats");
-}
-
-export function resetSession(): void {
-  mcpSessionId = null;
-  initialized = false;
-  initPromise = null;
-  requestId = 0;
-}
+export const api = {
+  dashboard: () => apiFetch<DashboardResponse>('/dashboard'),
+  servers: () => apiFetch<ServersResponse>('/servers'),
+  server: (id: string) => apiFetch<ServerDetailResponse>(`/servers/${id}`),
+  traces: (params?: TraceParams) => {
+    const qs = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiFetch<TracesResponse>(`/traces${qs}`);
+  },
+  trace: (id: string) => apiFetch<TraceDetailResponse>(`/traces/${id}`),
+  skills: () => apiFetch<SkillsResponse>('/skills'),
+  skill: (name: string) => apiFetch<SkillDetailResponse>(`/skills/${name}`),
+  memoryFiles: () => apiFetch<MemoryFilesResponse>('/memory-files'),
+  memoryFile: (name: string) => apiFetch<MemoryFileDetailResponse>(`/memory-files/${name}`),
+  usage: (period?: string) => apiFetch<UsageResponse>(`/usage?period=${period || 'today'}`),
+  sessions: (params?: SessionParams) => {
+    const qs = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiFetch<SessionsResponse>(`/sessions${qs}`);
+  },
+  session: (id: string) => apiFetch<SessionDetailResponse>(`/sessions/${id}`),
+  search: (q: string) => apiFetch<SearchResponse>(`/search?q=${encodeURIComponent(q)}`),
+};

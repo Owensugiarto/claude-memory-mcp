@@ -1,111 +1,228 @@
-// === API Response Types ===
+/* ── API Response Types ── */
 
-export interface HealthResponse {
-  ok: boolean;
-  total_sessions: number;
-  total_messages: number;
-  by_source: Record<string, number>;
-  by_project: Record<string, number>;
+export interface DashboardStats {
+  requests: number;
+  p95: number;
+  errorRate: number;
+  activeSessions: number;
 }
 
-export interface MemoryStats {
-  total_sessions: number;
-  total_messages: number;
-  by_source: Record<string, number>;
-  by_project: Record<string, number>;
+export interface ActivityItem {
+  dot: 'success' | 'warning' | 'error' | 'idle';
+  title: string;
+  meta: string;
+  time: string;
+  server: string;
 }
 
-export interface SearchResult {
+export interface ServerRow {
+  name: string;
+  transport: string;
+  tools: string;
+  resources: string;
+  requests: string;
+  p95: string;
+  errors: string;
+  lastCall: string;
+  status: 'success' | 'warning' | 'error' | 'idle';
+}
+
+export interface DashboardResponse {
+  stats: DashboardStats;
+  activity: ActivityItem[];
+  servers: ServerRow[];
+}
+
+export interface ServerInfo {
+  id: string;
+  name: string;
+  transport: string;
+  status: 'success' | 'warning' | 'error' | 'idle';
+  version: string;
+  pid: number;
+  uptime: string;
+  url: string;
+}
+
+export interface ToolInfo {
+  name: string;
+  desc: string;
+  calls: string;
+  p95: string;
+  err: string;
+}
+
+export interface ServerDetailResponse {
+  server: ServerInfo;
+  tools: ToolInfo[];
+  resources: unknown[];
+  prompts: unknown[];
+}
+
+export interface ServersResponse {
+  servers: ServerRow[];
+}
+
+export interface TraceRow {
+  time: string;
+  level: 'info' | 'warn' | 'error';
+  server: string;
+  tool: string;
+  status: number;
+  dur: string;
+  caller: string;
+}
+
+export interface TracesResponse {
+  traces: TraceRow[];
+  total: number;
+}
+
+export interface TraceDetailResponse {
+  trace: TraceRow;
+  spans: SpanInfo[];
+  args: string;
+}
+
+export interface SpanInfo {
+  name: string;
+  start: number;
+  dur: number;
+  color: string;
+}
+
+export interface TraceParams {
+  server?: string;
+  level?: string;
+  status?: string;
+  limit?: string;
+}
+
+export interface SessionInfo {
+  id: string;
+  started: string;
+  chats: number;
+  in: number;
+  out: number;
+  cached: number;
+  cost: string;
+  model: string;
+}
+
+export interface ChatInfo {
+  id: string;
+  title: string;
+  turns: number;
+  in: number;
+  out: number;
+  ctxPct: number;
+  started: string;
+  server: string;
+}
+
+export interface UsageResponse {
+  stats: {
+    tokensToday: number;
+    contextPct: number;
+    activeSessions: number;
+    costToday: string;
+  };
+  sessions: SessionInfo[];
+  chats: ChatInfo[];
+  models: ModelUsage[];
+}
+
+export interface ModelUsage {
+  name: string;
+  tok: number;
+  cost: string;
+  color: string;
+}
+
+export interface SkillInfo {
+  name: string;
+  title: string;
+  tokens: number;
+  used: string;
+  updated: string;
+  tags: string[];
+}
+
+export interface SkillsResponse {
+  skills: SkillInfo[];
+}
+
+export interface SkillDetailResponse {
+  skill: SkillInfo;
   content: string;
-  role: string;
-  session_id: string;
-  project: string | null;
-  source: string;
-  timestamp: string;
-  score: number;
+}
+
+export interface MemoryFileInfo {
+  name: string;
+  title: string;
+  tokens: number;
+  kind: 'global' | 'scoped';
+  scope?: string;
+  updated: string;
+}
+
+export interface MemoryFilesResponse {
+  files: MemoryFileInfo[];
+}
+
+export interface MemoryFileDetailResponse {
+  file: MemoryFileInfo;
+  content: string;
+}
+
+export interface LogInfo {
+  name: string;
+  title: string;
+  turns: number;
+  tokens: number;
+  started: string;
+  model: string;
+}
+
+export interface SessionsResponse {
+  sessions: LogInfo[];
+}
+
+export interface SessionDetailResponse {
+  session: LogInfo;
+  content: string;
+}
+
+export interface SessionParams {
+  limit?: string;
+  offset?: string;
 }
 
 export interface SearchResponse {
-  results: SearchResult[];
-  total: number;
+  results: Array<{
+    type: string;
+    name: string;
+    title: string;
+    snippet: string;
+  }>;
 }
 
-export interface SessionSummary {
-  session_id: string;
-  source: string;
-  project: string | null;
-  machine_name: string | null;
-  session_slug: string | null;
-  created_at: string;
-  updated_at: string;
-  message_count: number;
-  first_message: string | null;
-  last_message: string | null;
+export type PageId =
+  | 'overview'
+  | 'servers'
+  | 'traces'
+  | 'usage'
+  | 'skills'
+  | 'memories'
+  | 'logs';
+
+export interface AccentConfig {
+  default: string;
+  hover: string;
+  dim: string;
+  fg: string;
+  swatch: string;
 }
 
-export interface SessionListResponse {
-  sessions: SessionSummary[];
-  total: number;
-}
-
-export interface SessionMessage {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-export interface SessionDetail {
-  session_id: string;
-  source: string;
-  project: string | null;
-  machine_name: string | null;
-  session_slug: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SessionResponse {
-  session: SessionDetail;
-  messages: SessionMessage[];
-}
-
-// === MCP Protocol Types ===
-
-export interface McpRequest {
-  jsonrpc: "2.0";
-  id?: number;
-  method: string;
-  params?: Record<string, unknown>;
-}
-
-export interface McpToolContent {
-  type: "text";
-  text: string;
-}
-
-export interface McpResponse {
-  jsonrpc: "2.0";
-  id?: number;
-  result?: {
-    content?: McpToolContent[];
-    protocolVersion?: string;
-    capabilities?: Record<string, unknown>;
-    serverInfo?: { name: string; version: string };
-  };
-  error?: {
-    code: number;
-    message: string;
-  };
-}
-
-// === UI Types ===
-
-export type Source = "claude_code" | "claude_ai";
-
-export interface SearchFilters {
-  query: string;
-  source?: Source | "";
-  project?: string;
-  days?: number;
-  limit?: number;
-}
+export type AccentName = 'cobalt' | 'lime' | 'amber' | 'magenta' | 'emerald';
+export type DensityName = 'compact' | 'medium' | 'roomy';
