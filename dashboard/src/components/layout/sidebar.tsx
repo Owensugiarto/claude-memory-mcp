@@ -21,9 +21,10 @@ const items: NavEntry[] = [
   { id: 'traces', icon: 'logs', label: 'Traces' },
   { id: 'usage', icon: 'database', label: 'Usage' },
   { section: 'Context' },
-  { id: 'skills', icon: 'code', label: 'Skills', count: '14' },
-  { id: 'memories', icon: 'circle-help', label: 'Memories', count: '32' },
-  { id: 'logs', icon: 'logs', label: 'Logs', count: '186' },
+  { id: 'sessions', icon: 'logs', label: 'Sessions' },
+  { id: 'search', icon: 'search', label: 'Search' },
+  { id: 'skills', icon: 'code', label: 'Skills' },
+  { id: 'memories', icon: 'circle-help', label: 'Memories' },
   { section: 'Security' },
 ];
 

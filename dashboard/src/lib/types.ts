@@ -214,7 +214,8 @@ export type PageId =
   | 'usage'
   | 'skills'
   | 'memories'
-  | 'logs';
+  | 'sessions'
+  | 'search';
 
 export interface AccentConfig {
   default: string;

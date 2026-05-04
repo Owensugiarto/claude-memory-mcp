@@ -8,6 +8,7 @@ import { Usage } from './pages/usage';
 import { Skills } from './pages/skills';
 import { Memories } from './pages/memories';
 import { SessionLogs } from './pages/session-logs';
+import { Search } from './pages/search';
 import type { PageId, AccentName, DensityName } from './lib/types';
 
 const ACCENTS: Record<AccentName, { default: string; hover: string; dim: string; fg: string }> = {
@@ -25,7 +26,8 @@ const SCREENS: Record<PageId, { crumbs: string[] }> = {
   usage:    { crumbs: ['workspace', 'default', 'usage'] },
   skills:   { crumbs: ['workspace', 'default', 'context', 'skills'] },
   memories: { crumbs: ['workspace', 'default', 'context', 'memories'] },
-  logs:     { crumbs: ['workspace', 'default', 'context', 'logs'] },
+  sessions: { crumbs: ['workspace', 'default', 'sessions'] },
+  search:   { crumbs: ['workspace', 'default', 'search'] },
 };
 
 function applyAccent(name: AccentName) {
@@ -63,7 +65,8 @@ export default function App() {
       case 'usage': return <Usage />;
       case 'skills': return <Skills />;
       case 'memories': return <Memories />;
-      case 'logs': return <SessionLogs />;
+      case 'sessions': return <SessionLogs />;
+      case 'search': return <Search />;
       default: return <Dashboard onNav={setPage} />;
     }
   };
