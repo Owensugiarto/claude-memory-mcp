@@ -1,3 +1,4 @@
+declare const process: { env: Record<string, string | undefined> };
 const MCP_BASE = "https://owen-claude-memory.fly.dev";
 const API_KEY = process.env.MCP_API_KEY || "";
 
