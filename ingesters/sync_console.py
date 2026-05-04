@@ -175,7 +175,7 @@ def sync_skills(server_url: str, api_key: str, state: dict) -> dict:
             "title": title,
             "content": content,
             "tokens": estimate_tokens(content),
-            "tags": json.dumps(tags),
+            "tags": tags,
             "description": desc[:500],
         })
 
