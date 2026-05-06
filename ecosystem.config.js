@@ -21,6 +21,15 @@ module.exports = {
         MEMORY_SERVER_URL: "https://owen-claude-memory.fly.dev",
         API_KEY: "XytIKR_iFdmt0O-MFiYBuouq-YRwSAc64h4vTSn50CM"
       }
+    },
+    {
+      name: "weekly-git-backup",
+      script: "scripts/weekly-backup.sh",
+      interpreter: "bash",
+      cwd: "C:/dev/claude-memory-mcp",
+      cron_restart: "0 10 * * 0",
+      autorestart: false,
+      watch: false
     }
   ]
 };
